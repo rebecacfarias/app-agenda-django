@@ -3,6 +3,8 @@ from core.models import Evento
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
+from datetime import datetime, timedelta
+from django.http.response import Http404, JsonResponse
 
 # Create your views here.
 
@@ -27,10 +29,14 @@ def submit_login(request):
 
     return redirect('/')
 
+#odernar por hora
 @login_required(login_url='/login/')
 def lista_eventos(request):
     usuario = request.user
-    evento = Evento.objects.filter(usuario=usuario)
+    # filtrar para não mostrar eventos que já passaram, apenas os que estao 1h atrasados
+    data_atual = datetime.now() - timedelta(hours=1)
+    # revover segundo atributo abaixo caso queira exibir todas as atrasadas(em vermelho, setado no html)
+    evento = Evento.objects.filter(usuario=usuario,data_evento__gt=data_atual) #
     response = {'eventos': evento}
     return render(request,'agenda.html', response)
 
@@ -61,10 +67,23 @@ def submit_evento(request):
 @login_required(login_url='/login/')
 def delete_evento(request, id_evento):
     usuario = request.user
-    evento = Evento.objects.get(id=id_evento)
+    try:
+        evento = Evento.objects.get(id=id_evento)
+    except Exception:
+        raise Http404()
     if usuario == evento.usuario:
         evento.delete()
+    else:
+        raise Http404()
     return redirect('/')
+
+@login_required(login_url='/login/')
+def json_lista_evento(request):
+    usuario = request.user
+    data_atual = datetime.now() - timedelta(hours=1)
+    evento = Evento.objects.filter(usuario=usuario).values('id','titulo')
+    response = {'eventos': evento}
+    return JsonResponse(list(evento), safe=False)
 
 
 #caso nao use o RedirectView
